@@ -87,7 +87,9 @@ public class LoginPage extends Activity {
                 //Setting the timeout to 10 seconds here
                 Document doc = Jsoup.connect(html).timeout(10*1000).get();
                 Element body = doc.body();
-                Elements stuff = body.getElementsByClass("entry-wrap entry-content");
+                Elements test = doc.select("#top [role=main] #post-18 div ul");
+                Element top = body.getElementById("top");
+                Elements stuff = top.getElementsByClass("entry-wrap entry-content");
                 for (Element current : stuff)
                 {
                     if (current.tagName().equals("ul") && current.className().equals("x-block-grid three-up"))
