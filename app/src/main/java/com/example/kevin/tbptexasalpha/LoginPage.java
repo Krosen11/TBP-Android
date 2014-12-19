@@ -137,6 +137,7 @@ public class LoginPage extends Activity {
 
         public void updateArray(Context context)
         {
+            //Testing
             //Updates the autocomplete array
             ArrayList<String> names = new ArrayList<String>();
             if (officers.isEmpty() || threadLock.isLocked())
