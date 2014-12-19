@@ -1,6 +1,7 @@
 package com.example.kevin.tbptexasalpha;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.net.http.AndroidHttpClient;
 import android.os.AsyncTask;
@@ -12,10 +13,6 @@ import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -36,11 +33,16 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 public class LoginPage extends Activity {
 
+    private ProgressDialog progressDialog;
+    private boolean flag1;//Flag for completion of TBPSiteThread
+
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login_page);
+        flag1 = false;
+        progressDialog = ProgressDialog.show(this, "Loading...", "Loading, please wait...");
 
         //Getting information for the login page
         getTBPMembers();
@@ -50,17 +52,16 @@ public class LoginPage extends Activity {
     protected void getTBPMembers()
     {
         String html = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
+        String html2 = "https://docs.google.com/a/utexas.edu/spreadsheets/d/1cZK_XcDRVCatOfU825R-EO5WD7yrEh9m6rpKNLn-ePE/pubhtml?gid=302345735&single=true";
         ArrayUpdate update = new ArrayUpdate();
 
         //Starting a new thread to pull data from the internet
         TBPSiteThread thread = new TBPSiteThread(html, update);
+        TBPCandidateThread thread2 = new TBPCandidateThread(html2, update);
         thread.execute();
+        thread2.execute();
 
         int count = 0;
-        while(!update.doneFlag)
-        {
-            update.updateArray(this);
-        }
     }
 
     @Override
@@ -91,10 +92,12 @@ public class LoginPage extends Activity {
     {
         public boolean doneFlag;
         private ArrayList<String[]> officers;
+        private ArrayList<String> candidates;
         private ReentrantLock threadLock;//Lock created from the TBPSiteThread
         public ArrayUpdate()
         {
             officers = new ArrayList<String[]>();
+            candidates = new ArrayList<String>();
             threadLock = new ReentrantLock();
             doneFlag = false;
         }
@@ -103,7 +106,6 @@ public class LoginPage extends Activity {
         {
             //Only called from TBPSiteThread
             threadLock.lock();
-            Element body = doc.body();
             Elements officerList = doc.select("#top [role=main] #post-18 div ul li div");//Gets officer nodes
             for (Element officer : officerList)
             {
@@ -135,24 +137,70 @@ public class LoginPage extends Activity {
             threadLock.unlock();
         }
 
-        public void updateArray(Context context)
+        public void findCandidates(Document doc)
         {
-            //Testing
+            threadLock.lock();
+            int lineLock = 0;//Going to be used to get to actual candidate lines
+            Elements candidateList = doc.select("#sheets-viewport #302345735 div table tbody tr");
+            for (Element line : candidateList)
+            {
+                String word = line.text();
+                //This line is a blank line if the only text is the row #
+                boolean foundChar = false;
+                for (int i = 0; i < word.length(); i++)
+                {
+                    char current = word.charAt(i);
+                    if ((current > 'A' && current < 'Z') || (current > 'a' && current < 'z'))
+                    {
+                        //This means that this char is a letter, so we are done
+                        foundChar = true;
+                        break;
+                    }
+                }
+                if (!foundChar)
+                {
+                    //This means we have reached a new section, so let's reset lineLock
+                    lineLock = 0;
+                    continue;
+                }
+                if (lineLock < 2)
+                {
+                    lineLock++;
+                    continue;
+                }
+
+                //If we get here, we are on a candidate line
+                Elements cells = line.getElementsByTag("td");
+                String firstName = cells.get(0).ownText();
+                String lastName = cells.get(1).ownText();
+                String name = firstName.concat(" " + lastName);
+
+                candidates.add(name);
+            }
+            threadLock.unlock();
+        }
+
+        public void updateArray()
+        {
             //Updates the autocomplete array
             ArrayList<String> names = new ArrayList<String>();
-            if (officers.isEmpty() || threadLock.isLocked())
+            if (officers.isEmpty() || candidates.isEmpty() || threadLock.isLocked())
             {
                 return;
             }
             AutoCompleteTextView view = (AutoCompleteTextView) findViewById(R.id.user_name);
             for (String[] list : officers)
             {
-                names.add(list[0]);
+                names.add(list[0] + ", " + list[1]);//Puts officer name and position in
+            }
+            for (String name : candidates)
+            {
+                names.add(name + ", Candidate");
             }
 
-            ArrayAdapter<String> adapter = new ArrayAdapter<String>(context, android.R.layout.simple_list_item_1, names);
+            ArrayAdapter<String> adapter = new ArrayAdapter<String>(LoginPage.this, android.R.layout.simple_list_item_1, names);
             view.setAdapter(adapter);
-            doneFlag = true;
+            progressDialog.dismiss();
         }
     }
 
@@ -166,7 +214,7 @@ public class LoginPage extends Activity {
             update = temp;
         }
 
-        public Void doInBackground(Void... voids)
+        protected Void doInBackground(Void... voids)
         {
             Void empty = null;
             try
@@ -182,9 +230,44 @@ public class LoginPage extends Activity {
             return empty;
         }
 
-        public void onPostExecute(Void empty)
+        protected void onPostExecute(Void empty)
         {
+            flag1 = true;
             System.out.println("Success");
+        }
+    }
+
+    private class TBPCandidateThread extends AsyncTask<Void, Void, Void>
+    {
+        private String html;
+        private ArrayUpdate update;
+        public TBPCandidateThread(String link, ArrayUpdate temp)
+        {
+            html = link;
+            update = temp;
+        }
+
+        protected Void doInBackground(Void... voids)
+        {
+            Void empty = null;
+            try
+            {
+                //Setting the timeout to 10 seconds here
+                Document doc = Jsoup.connect(html).timeout(10*1000).get();
+                update.findCandidates(doc);
+            }
+            catch(IOException e)
+            {
+                e.printStackTrace();
+            }
+            return empty;
+        }
+
+        protected void onPostExecute(Void empty)
+        {
+            while (!flag1){}
+            update.updateArray();
+            System.out.println("Success 2");
         }
     }
 }
