@@ -3,6 +3,7 @@ package com.example.kevin.tbptexasalpha;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.net.http.AndroidHttpClient;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -10,8 +11,11 @@ import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.TextView;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -24,6 +28,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -184,6 +189,7 @@ public class LoginPage extends Activity {
         {
             //Updates the autocomplete array
             ArrayList<String> names = new ArrayList<String>();
+            ArrayList<String> contact = new ArrayList<String>();
             if (officers.isEmpty() || candidates.isEmpty() || threadLock.isLocked())
             {
                 return;
@@ -192,14 +198,42 @@ public class LoginPage extends Activity {
             for (String[] list : officers)
             {
                 names.add(list[0] + ", " + list[1]);//Puts officer name and position in
+                contact.add(list[2]);
             }
             for (String name : candidates)
             {
                 names.add(name + ", Candidate");
             }
 
+            final ArrayList<String> nameList = names;
+            final ArrayList<String> contactList = contact;
+
             ArrayAdapter<String> adapter = new ArrayAdapter<String>(LoginPage.this, android.R.layout.simple_list_item_1, names);
             view.setAdapter(adapter);
+            view.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                    Intent intent = null;
+                    String name = ((TextView) view).getText().toString();
+
+                    if (name.contains("Candidate"))
+                    {
+                        //Go to a candidate page
+                    }
+                    else
+                    {
+                        //Go to an officer page
+                        intent = new Intent(LoginPage.this, OfficerPage.class);
+                        intent.putExtra("name", name);
+
+                        //Now I need to get the contact information
+                        int index = nameList.indexOf(name);
+                        intent.putExtra("contact", contactList.get(index));
+                    }
+
+                    startActivity(intent);
+                }
+            });
             progressDialog.dismiss();
         }
     }
