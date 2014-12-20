@@ -22,6 +22,10 @@
             android:name=".OfficerPage"
             android:label="@string/title_activity_officer_page" >
         </activity>
+        <activity
+            android:name=".CandidatePage"
+            android:label="@string/title_activity_candidate_page" >
+        </activity>
     </application>
 
 </manifest>

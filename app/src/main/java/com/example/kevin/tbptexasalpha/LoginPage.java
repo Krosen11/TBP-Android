@@ -30,6 +30,8 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -98,11 +100,13 @@ public class LoginPage extends Activity {
         public boolean doneFlag;
         private ArrayList<String[]> officers;
         private ArrayList<String> candidates;
+        private ArrayList<String[]> vals;//This is for the candidate's non-name stats
         private ReentrantLock threadLock;//Lock created from the TBPSiteThread
         public ArrayUpdate()
         {
             officers = new ArrayList<String[]>();
             candidates = new ArrayList<String>();
+            vals = new ArrayList<String[]>();
             threadLock = new ReentrantLock();
             doneFlag = false;
         }
@@ -180,7 +184,24 @@ public class LoginPage extends Activity {
                 String lastName = cells.get(1).ownText();
                 String name = firstName.concat(" " + lastName);
 
+                int counter = 0;
+                String[] tempVals = new String[14];
+                //Info from 5-13, 15, 17, 19, 21, 23
+                for (int i = 5; i <= 23; i++)
+                {
+                    String value = cells.get(i).ownText();
+                    if (value.isEmpty()) {value = "0";}
+                    tempVals[counter] = value;
+                    if (i > 12 && i % 2 == 1)
+                    {
+                        //Need to increment by 2 in this case
+                        i++;
+                    }
+                    counter++;
+                }
+
                 candidates.add(name);
+                vals.add(tempVals);
             }
             threadLock.unlock();
         }
@@ -219,6 +240,13 @@ public class LoginPage extends Activity {
                     if (name.contains("Candidate"))
                     {
                         //Go to a candidate page
+                        intent = new Intent(LoginPage.this, CandidatePage.class);
+                        intent.putExtra("name", name);
+
+                        //Now we need the extra info
+                        int index = nameList.indexOf(name);
+                        index = index - 15;//Subtract out the officers
+                        intent.putExtra("values", vals.get(index));
                     }
                     else
                     {
