@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/TBPTexasAlpha.iml" filepath="$PROJECT_DIR$/TBPTexasAlpha.iml" />
+      <module fileurl="file://$PROJECT_DIR$/TBP-Android.iml" filepath="$PROJECT_DIR$/TBP-Android.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>
 </project>
-
