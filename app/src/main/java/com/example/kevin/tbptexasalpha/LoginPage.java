@@ -12,10 +12,7 @@ import android.provider.DocumentsContract;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
-import android.widget.TextView;
+import android.widget.*;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -48,8 +45,21 @@ public class LoginPage extends Activity {
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login_page);
-        flag1 = false;
         progressDialog = ProgressDialog.show(this, "Loading...", "Loading, please wait...");
+
+        DrawerOnClickListener drawer = new DrawerOnClickListener(LoginPage.this);
+
+        //Testing drawer
+        String[] strings = new String[101];
+        strings[0] = "Officers";
+        for (int i = 1; i < 101; i++){
+            strings[i] = "Hello " + Integer.toString(i);
+        }
+
+        ListView drawerList = (ListView) findViewById(R.id.left_drawer);
+        drawerList.setAdapter(new ArrayAdapter<String>(this,
+                R.layout.drawer_list_item, strings));
+        drawerList.setOnItemClickListener(drawer);
 
         //Getting information for the login page
         getTBPMembers();
@@ -58,15 +68,16 @@ public class LoginPage extends Activity {
 
     protected void getTBPMembers()
     {
-        String html = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
         String html2 = "https://docs.google.com/a/utexas.edu/spreadsheets/d/1cZK_XcDRVCatOfU825R-EO5WD7yrEh9m6rpKNLn-ePE/pubhtml?gid=302345735&single=true";
         ArrayUpdate update = new ArrayUpdate();
 
         //Starting a new thread to pull data from the internet
-        TBPSiteThread thread = new TBPSiteThread(html, update);
-        TBPCandidateThread thread2 = new TBPCandidateThread(html2, update);
-        thread.execute();
-        thread2.execute();
+        CandidateData data = new CandidateData(html2, update);
+        Thread thread = new Thread(data);
+        thread.start();
+
+        while (thread.isAlive()) {}
+        update.updateArray();
 
         int count = 0;
     }
@@ -98,82 +109,37 @@ public class LoginPage extends Activity {
     public class ArrayUpdate
     {
         public boolean doneFlag;
-        private ArrayList<String[]> officers;
         private ArrayList<String> candidates;
-        private ArrayList<String[]> vals;//This is for the candidate's non-name stats
-        private ReentrantLock threadLock;//Lock created from the TBPSiteThread
+        private ArrayList<String[]> vals;//This is for the candidate's non-name state
         public ArrayUpdate()
         {
-            officers = new ArrayList<String[]>();
             candidates = new ArrayList<String>();
             vals = new ArrayList<String[]>();
-            threadLock = new ReentrantLock();
             doneFlag = false;
-        }
-
-        public void findOfficers(Document doc)
-        {
-            //Only called from TBPSiteThread
-            threadLock.lock();
-            Elements officerList = doc.select("#top [role=main] #post-18 div ul li div");//Gets officer nodes
-            for (Element officer : officerList)
-            {
-                String info = officer.text();
-
-                //Now we will extrapolate officer position, name, and contact info
-                int lastSpace = info.lastIndexOf(" ");
-                String part1 = info.substring(0, lastSpace);
-
-                int firstSpace = part1.lastIndexOf(" ");
-                part1 = part1.substring(0, firstSpace);
-                int nextSpace = part1.lastIndexOf(" ");
-                part1 = part1.substring(0, nextSpace);
-
-                int space1 = part1.lastIndexOf(" ");
-                String lastName = part1.substring(space1 + 1, part1.length());
-                String part2 = info.substring(0, space1);
-
-                int space2 = part2.lastIndexOf(" ");
-                String firstName = part2. substring(space2 + 1, part2.length());
-
-                String name = firstName.concat(" " + lastName);
-                String position = part2.substring(0, space2);
-                String contact = info.substring(lastSpace + 1);
-                String[] information = {name, position, contact};
-
-                officers.add(information);
-            }
-            threadLock.unlock();
         }
 
         public void findCandidates(Document doc)
         {
-            threadLock.lock();
             int lineLock = 0;//Going to be used to get to actual candidate lines
             Elements candidateList = doc.select("#sheets-viewport #302345735 div table tbody tr");
-            for (Element line : candidateList)
-            {
+            for (Element line : candidateList) {
                 String word = line.text();
                 //This line is a blank line if the only text is the row #
                 boolean foundChar = false;
-                for (int i = 0; i < word.length(); i++)
-                {
+                for (int i = 0; i < word.length(); i++) {
                     char current = word.charAt(i);
-                    if ((current > 'A' && current < 'Z') || (current > 'a' && current < 'z'))
-                    {
+                    if ((current > 'A' && current < 'Z') || (current > 'a' && current < 'z')) {
                         //This means that this char is a letter, so we are done
                         foundChar = true;
                         break;
                     }
                 }
-                if (!foundChar)
-                {
+                if (!foundChar) {
                     //This means we have reached a new section, so let's reset lineLock
                     lineLock = 0;
                     continue;
                 }
-                if (lineLock < 2)
-                {
+                if (lineLock < 2) {
                     lineLock++;
                     continue;
                 }
@@ -187,13 +153,13 @@ public class LoginPage extends Activity {
                 int counter = 0;
                 String[] tempVals = new String[14];
                 //Info from 5-13, 15, 17, 19, 21, 23
-                for (int i = 5; i <= 23; i++)
-                {
+                for (int i = 5; i <= 23; i++) {
                     String value = cells.get(i).ownText();
-                    if (value.isEmpty()) {value = "0";}
+                    if (value.isEmpty()) {
+                        value = "0";
+                    }
                     tempVals[counter] = value;
-                    if (i > 12 && i % 2 == 1)
-                    {
+                    if (i > 12 && i % 2 == 1) {
                         //Need to increment by 2 in this case
                         i++;
                     }
@@ -203,7 +169,6 @@ public class LoginPage extends Activity {
                 candidates.add(name);
                 vals.add(tempVals);
             }
-            threadLock.unlock();
         }
 
         public void updateArray()
@@ -211,19 +176,10 @@ public class LoginPage extends Activity {
             //Updates the autocomplete array
             ArrayList<String> names = new ArrayList<String>();
             ArrayList<String> contact = new ArrayList<String>();
-            if (officers.isEmpty() || candidates.isEmpty() || threadLock.isLocked())
-            {
-                return;
-            }
             AutoCompleteTextView view = (AutoCompleteTextView) findViewById(R.id.user_name);
-            for (String[] list : officers)
-            {
-                names.add(list[0] + ", " + list[1]);//Puts officer name and position in
-                contact.add(list[2]);
-            }
             for (String name : candidates)
             {
-                names.add(name + ", Candidate");
+                names.add(name);
             }
 
             final ArrayList<String> nameList = names;
@@ -237,27 +193,14 @@ public class LoginPage extends Activity {
                     Intent intent = null;
                     String name = ((TextView) view).getText().toString();
 
-                    if (name.contains("Candidate"))
-                    {
-                        //Go to a candidate page
-                        intent = new Intent(LoginPage.this, CandidatePage.class);
-                        intent.putExtra("name", name);
+                    //Go to a candidate page
+                    intent = new Intent(LoginPage.this, CandidatePage.class);
+                    intent.putExtra("name", name);
 
-                        //Now we need the extra info
-                        int index = nameList.indexOf(name);
-                        index = index - 15;//Subtract out the officers
-                        intent.putExtra("values", vals.get(index));
-                    }
-                    else
-                    {
-                        //Go to an officer page
-                        intent = new Intent(LoginPage.this, OfficerPage.class);
-                        intent.putExtra("name", name);
-
-                        //Now I need to get the contact information
-                        int index = nameList.indexOf(name);
-                        intent.putExtra("contact", contactList.get(index));
-                    }
+                    //Now we need the extra info
+                    int index = nameList.indexOf(name);
+                    //index = index - 15;//Subtract out the officers
+                    intent.putExtra("values", vals.get(index));
 
                     startActivity(intent);
                 }
@@ -266,70 +209,24 @@ public class LoginPage extends Activity {
         }
     }
 
-    private class TBPSiteThread extends AsyncTask<Void, Void, Void>
-    {
-        private String html;
-        private ArrayUpdate update;
-        public TBPSiteThread(String link, ArrayUpdate temp)
-        {
-            html = link;
-            update = temp;
+    private class CandidateData implements Runnable {
+        String html;
+        ArrayUpdate update;
+
+        public CandidateData(String html, ArrayUpdate update){
+            this.html = html;
+            this.update = update;
         }
 
-        protected Void doInBackground(Void... voids)
-        {
-            Void empty = null;
-            try
-            {
-                //Setting the timeout to 10 seconds here
-                Document doc = Jsoup.connect(html).timeout(10*1000).get();
-                update.findOfficers(doc);
-            }
-            catch(IOException e)
-            {
-                e.printStackTrace();
-            }
-            return empty;
-        }
-
-        protected void onPostExecute(Void empty)
-        {
-            flag1 = true;
-            System.out.println("Success");
-        }
-    }
-
-    private class TBPCandidateThread extends AsyncTask<Void, Void, Void>
-    {
-        private String html;
-        private ArrayUpdate update;
-        public TBPCandidateThread(String link, ArrayUpdate temp)
-        {
-            html = link;
-            update = temp;
-        }
-
-        protected Void doInBackground(Void... voids)
-        {
-            Void empty = null;
-            try
-            {
-                //Setting the timeout to 10 seconds here
-                Document doc = Jsoup.connect(html).timeout(10*1000).get();
+        @Override
+        public void run() {
+            try {
+                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
                 update.findCandidates(doc);
             }
-            catch(IOException e)
-            {
-                e.printStackTrace();
+            catch (IOException e){
+                System.out.println("Couldn't connect to URL");
             }
-            return empty;
-        }
-
-        protected void onPostExecute(Void empty)
-        {
-            while (!flag1){}
-            update.updateArray();
-            System.out.println("Success 2");
         }
     }
 }

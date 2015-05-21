@@ -32,6 +32,8 @@ public class OfficerPage extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_officer_page);
 
+        //Note: This is old code. Need to fix
+
         Intent intent = getIntent();
         officerName = intent.getStringExtra("name");
         String contact = intent.getStringExtra("contact");
@@ -123,4 +125,46 @@ public class OfficerPage extends Activity {
             progressDialog.dismiss();
         }
     }
+
+    //Note: This is code from old LoginPage.java that parsed the Officer page for officer names
+    /*
+    String html = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
+    public void findOfficers(Document doc)
+    {
+        //Only called from TBPSiteThread
+        threadLock.lock();
+        try {
+            Elements officerList = doc.select("#top [role=main] #post-18 div ul li div");//Gets officer nodes
+            for (Element officer : officerList) {
+                String info = officer.text();
+
+                //Now we will extrapolate officer position, name, and contact info
+                int lastSpace = info.lastIndexOf(" ");
+                String part1 = info.substring(0, lastSpace);
+
+                int firstSpace = part1.lastIndexOf(" ");
+                part1 = part1.substring(0, firstSpace);
+                int nextSpace = part1.lastIndexOf(" ");
+                part1 = part1.substring(0, nextSpace);
+
+                int space1 = part1.lastIndexOf(" ");
+                String lastName = part1.substring(space1 + 1, part1.length());
+                String part2 = info.substring(0, space1);
+
+                int space2 = part2.lastIndexOf(" ");
+                String firstName = part2.substring(space2 + 1, part2.length());
+
+                String name = firstName.concat(" " + lastName);
+                String position = part2.substring(0, space2);
+                String contact = info.substring(lastSpace + 1);
+                String[] information = {name, position, contact};
+
+                officers.add(information);
+            }
+        }
+        finally {
+            threadLock.unlock();
+        }
+    }
+    */
 }
