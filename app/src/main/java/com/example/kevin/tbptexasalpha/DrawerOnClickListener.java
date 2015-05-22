@@ -22,16 +22,7 @@ public class DrawerOnClickListener implements ListView.OnItemClickListener {
 
     private void selectMenu(View view, int position){
         Intent intent = null;
-        //String name = ((TextView) view).getText().toString();
-
-        //Go to a candidate page
         intent = new Intent(currentActivity, OfficerPage.class);
-        //intent.putExtra("name", name);
-
-        //Now we need the extra info
-        //int index = nameList.indexOf(name);
-        //index = index - 15;//Subtract out the officers
-        //intent.putExtra("values", vals.get(index));
 
         currentActivity.startActivity(intent);
     }
