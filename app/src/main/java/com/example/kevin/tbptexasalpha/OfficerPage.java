@@ -24,16 +24,22 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.LineNumberReader;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 
 public class OfficerPage extends Activity {
 
-    private String officerName;
+    //TODO: Also pull in officer office hours and display alongside the officer information
+
     public String html;
     public ArrayList<String> officers;
     public ArrayList<ImageView> images;
-    //private ImageView view;
     private ProgressDialog progressDialog;
 
     @Override
@@ -41,8 +47,7 @@ public class OfficerPage extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_officer_page);
 
-        Intent intent = getIntent();
-        progressDialog = ProgressDialog.show(this, "Welcome " + officerName, "Please wait...");
+        progressDialog = ProgressDialog.show(this, "Loading Officer Information", "Please wait...");
 
         officers = new ArrayList<String>();
         images = new ArrayList<ImageView>();
@@ -51,41 +56,6 @@ public class OfficerPage extends Activity {
         OfficerData data = new OfficerData();
         Thread thread = new Thread(data);
         thread.start();
-
-        while(thread.isAlive()) {}
-
-        for (String officer : officers){
-            System.out.println(officer);
-        }
-
-        showOfficerInfo();
-
-        //Note: This is old code. Need to fix
-        /*
-
-        Intent intent = getIntent();
-        officerName = intent.getStringExtra("name");
-        String contact = intent.getStringExtra("contact");
-
-        int comma = officerName.indexOf(",");
-        String position = officerName.substring(comma + 1);
-        officerName = officerName.substring(0, comma);
-        view = (ImageView) findViewById(R.id.officer_picture);
-
-        TextView textView = (TextView) findViewById(R.id.officer_name);
-        textView.setText(officerName);
-
-        TextView textView2 = (TextView) findViewById(R.id.officer_position);
-        textView2.setText(position);
-
-        TextView textView3 = (TextView) findViewById(R.id.officer_contact);
-        textView3.setText(contact);
-
-        progressDialog = ProgressDialog.show(this, "Welcome " + officerName, "Please wait...");
-        String link = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
-        OfficerInfo thread = new OfficerInfo(link);
-        thread.execute();
-        */
     }
 
 
@@ -113,53 +83,37 @@ public class OfficerPage extends Activity {
 
     public void findOfficers(Document doc)
     {
-        Elements officerList = doc.select("#top [role=main] #post-18 div ul li div");//Gets officer nodes
+        Elements officerList = doc.select("#top [role=main] #post-18 div ul li");// div");//Gets officer nodes
         for (Element officer : officerList) {
             String info = officer.text();
             officers.add(info);
 
-            //Now we will extrapolate officer position, name, and contact info
-            /*
-            int lastSpace = info.lastIndexOf(" ");
-            String part1 = info.substring(0, lastSpace);
+            //Now let's get the picture
+            Elements child = officer.select("img");
+            String link = child.attr("src");
+            try {
+                InputStream io = new java.net.URL(link).openStream();
+                Bitmap image = BitmapFactory.decodeStream(io);
 
-            int firstSpace = part1.lastIndexOf(" ");
-            part1 = part1.substring(0, firstSpace);
-            int nextSpace = part1.lastIndexOf(" ");
-            part1 = part1.substring(0, nextSpace);
-
-            int space1 = part1.lastIndexOf(" ");
-            String lastName = part1.substring(space1 + 1, part1.length());
-            String part2 = info.substring(0, space1);
-
-            int space2 = part2.lastIndexOf(" ");
-            String firstName = part2.substring(space2 + 1, part2.length());
-
-            String name = firstName.concat(" " + lastName);
-            String position = part2.substring(0, space2);
-            String contact = info.substring(lastSpace + 1);
-            String[] information = {name, position, contact};
-            */
+                ImageView view = new ImageView(OfficerPage.this);
+                view.setImageBitmap(image);
+                io.close();
+                images.add(view);
+            }
+            catch (IOException e){
+                System.out.println("Bad URL");
+            }
         }
-        progressDialog.dismiss();
     }
 
-    public void showOfficerInfo(){
-        //TODO: need to divy up the work amongst multiple threads somehow
+    public void showOfficerInfo() {
 
         int index = 0;
         LinearLayout layout = (LinearLayout) findViewById(R.id.officer_layout);
+        ExecutorService threadPool = Executors.newSingleThreadExecutor();
 
-        for (String officer : officers){
-            ImageView picture;
+        for (String officer : officers) {
             TextView viewName, viewPos, viewContact;
-
-            //Let's first start the picture retrieval process
-            OfficerPicture pic = new OfficerPicture(officer);
-            Thread picThread = new Thread(pic);
-            picThread.start();
-
-            while (picThread.isAlive()) {}
 
             //Now we will get the officer information
             int lastSpace = officer.lastIndexOf(" ");
@@ -182,133 +136,80 @@ public class OfficerPage extends Activity {
             String contact = officer.substring(lastSpace + 1);
 
             //Now let's display everything
-            viewName = new TextView(this);
-            viewPos = new TextView(this);
-            viewContact = new TextView(this);
-
-            ImageView currImage = images.get(index);
-            currImage.setId(4 * index);
-            layout.addView(currImage);
-
-            viewName.setText(name);
-            viewName.setId(4 * index + 1);
-            layout.addView(viewName);
-
-            viewPos.setText(position);
-            viewName.setId(4 * index + 2);
-            layout.addView(viewPos);
-
-            viewContact.setText(contact);
-            viewName.setId(4 * index + 3);
-            layout.addView(viewContact);
-
-            TextView blankLine = new TextView(this);
-            blankLine.setText("");
-            layout.addView(blankLine);
+            Future pic = threadPool.submit(new AddPic(images.get(index), layout));
+            Future text1 = threadPool.submit(new AddText(name, layout));
+            Future text2 = threadPool.submit(new AddText(position, layout));
+            Future text3 = threadPool.submit(new AddText(contact, layout));
 
             index++;
         }
     }
 
-    private class OfficerPicture implements Runnable {
-        //TODO: merge with OfficerData to speed up process (no need to connect to site twice!)
-        String officer;
-
-        public OfficerPicture(String officer){
-            this.officer = officer;
+    //Adds a text view to the Layout
+    private class AddText implements Runnable {
+        LinearLayout layout;
+        TextView view;
+        String text;
+        public AddText(String text, LinearLayout layout){
+            this.text = text;
+            this.layout = layout;
         }
 
         @Override
         public void run() {
-            try {
-                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
-                Elements officers = doc.select("#top [role=main] #post-18 div ul li");
-                for (Element currOff : officers){
-                    String nodeText = currOff.text();
-                    if (!nodeText.equals(officer)) continue;
-                    //This means that we are on the right node. So, let's try to get the picture 1st
-                    Elements child = currOff.select("img");
-                    String link = child.attr("src");
-                    InputStream io = new java.net.URL(link).openStream();
-                    Bitmap image = BitmapFactory.decodeStream(io);
-
-                    ImageView view = new ImageView(OfficerPage.this);
-                    view.setImageBitmap(image);
-                    io.close();
-                    images.add(view);
-
-                    break;
+            view = new TextView(OfficerPage.this);
+            view.setText(text);
+            //Can only add views on the UI Thread
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    layout.addView(view);
                 }
-            }
-            catch (IOException e){
-                System.out.println("Couldn't connect to URL");
-            }
+            });
         }
     }
 
-    private class OfficerData implements Runnable {
-
-        public OfficerData(){
-
+    //Adds a picture to the Layout
+    private class AddPic implements Runnable {
+        LinearLayout layout;
+        ImageView view;
+        public AddPic(ImageView view, LinearLayout layout){
+            this.view = view;
+            this.layout = layout;
         }
+
+        @Override
+        public void run() {
+            //Can only add views on the UI thread
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    layout.addView(view);
+                }
+            });
+        }
+    }
+
+    //This class will get the Officer info from the website
+    private class OfficerData implements Runnable {
 
         @Override
         public void run() {
             try {
                 Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
                 findOfficers(doc);
+                showOfficerInfo();
+                //Can only deal with ProgressDialogs on the UI thread
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        progressDialog.dismiss();
+                    }
+                });
             }
             catch (IOException e){
                 System.out.println("Couldn't connect to URL");
             }
         }
     }
-
-    /*
-
-    private class OfficerInfo extends AsyncTask<Void, Void, Bitmap>
-    {
-        private String html;
-
-        public OfficerInfo(String link)
-        {
-            html = link;
-        }
-
-        protected Bitmap doInBackground(Void... voids)
-        {
-            Bitmap image = null;
-            try
-            {
-                Document doc = Jsoup.connect(html).timeout(10*1000).get();
-                Elements officers = doc.select("#top [role=main] #post-18 div ul li");
-                for (Element officer : officers)
-                {
-                    String nodeText = officer.text();
-                    if (!nodeText.contains(officerName)) {continue;}
-                    //This means that we are on the right node. So, let's try to get the picture 1st
-                    System.out.print("Found");
-                    Elements child = officer.select("img");
-                    String link = child.attr("src");
-                    InputStream io = new java.net.URL(link).openStream();
-                    image = BitmapFactory.decodeStream(io);
-                    io.close();
-                    break;
-                }
-            }
-            catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-            return image;
-        }
-
-        protected void onPostExecute(Bitmap image)
-        {
-            view.setImageBitmap(image);
-            System.out.println("Success");
-            progressDialog.dismiss();
-        }
-    }
-    */
 }

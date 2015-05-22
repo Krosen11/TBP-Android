@@ -9,6 +9,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Looper;
 import android.provider.DocumentsContract;
+import android.support.v4.widget.DrawerLayout;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -47,8 +48,6 @@ public class LoginPage extends Activity {
         setContentView(R.layout.activity_login_page);
         progressDialog = ProgressDialog.show(this, "Loading...", "Loading, please wait...");
 
-        DrawerOnClickListener drawer = new DrawerOnClickListener(LoginPage.this);
-
         //Testing drawer
         String[] strings = new String[101];
         strings[0] = "Officers";
@@ -56,7 +55,10 @@ public class LoginPage extends Activity {
             strings[i] = "Hello " + Integer.toString(i);
         }
 
+        DrawerLayout layout = (DrawerLayout) findViewById(R.id.drawer_layout);
         ListView drawerList = (ListView) findViewById(R.id.left_drawer);
+        DrawerOnClickListener drawer = new DrawerOnClickListener(LoginPage.this, layout, drawerList);
+
         drawerList.setAdapter(new ArrayAdapter<String>(this,
                 R.layout.drawer_list_item, strings));
         drawerList.setOnItemClickListener(drawer);
