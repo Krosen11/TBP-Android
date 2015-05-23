@@ -130,18 +130,6 @@ public class LoginPage extends Activity {
                         break;
                     }
                 }
-                /*
-                if (!foundChar) {
-                    //This means we have reached a new section, so let's reset lineLock
-                    lineLock = 0;
-                    continue;
-                }
-
-                if (lineLock < 2) {
-                    lineLock++;
-                    continue;
-                }
-                */
 
                 //If we get here, we are on a candidate line
                 Elements cells = line.getElementsByTag("td");
@@ -180,7 +168,6 @@ public class LoginPage extends Activity {
             for (String name : candidates)
             {
                 names.add(name);
-                System.out.println(name);
             }
 
             final ArrayList<String> nameList = names;

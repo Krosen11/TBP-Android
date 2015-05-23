@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.LineNumberReader;
 import java.net.MalformedURLException;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +41,7 @@ public class OfficerPage extends Activity {
     public ArrayList<String> officers;
     public ArrayList<ImageView> images;
     private ProgressDialog progressDialog;
+    private Map<String,ArrayList<OfficerTime>> officeHours;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,9 +52,11 @@ public class OfficerPage extends Activity {
 
         officers = new ArrayList<String>();
         images = new ArrayList<ImageView>();
+        officeHours = new LinkedHashMap<String, ArrayList<OfficerTime>>();
 
         html = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
-        OfficerData data = new OfficerData();
+        //OfficerData data = new OfficerData();
+        OfficeHours data = new OfficeHours();
         Thread thread = new Thread(data);
         thread.start();
     }
@@ -81,16 +84,67 @@ public class OfficerPage extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-    //NOTE: Going to add potential code for getting office hours
-    //doc.select("#sheets-viewport div div table tbody tr");
-    //Iterate through
-    //  Keep track of the current position of each column
-    //  Skip the first row (just the days of the week; 2 columns for each day)
-    //  Now for the current row:
-    //      Get the 30 minute time block of this row
-    //      For each new cell found
-    //          Check to see if there is a name in the Text. If so, add to that officer's hours (Map?)
-    //          If no name, still record the rows/columns the black space takes up.
+    public String getOfficeHoursSheet(Document doc){
+        Elements links = doc.select("#top div article div p:contains(TBP) [href]");
+        for (Element link : links){
+            //Only one of these
+            return link.attr("href");
+        }
+
+        return "";//Will never be called, but needed
+    }
+
+    public void getOfficeHours(Document doc) {
+        int currRow = 0;
+        int[] columnInfo = new int[10];
+        for (int i = 0; i < 10; i++){
+            columnInfo[i] = 0;
+        }
+        Elements rows = doc.select("#sheets-viewport div div table tbody tr");
+        for (Element row : rows){
+            if (currRow == 0){
+                currRow++;
+                continue;
+            }
+
+            Elements blocks = row.getElementsByTag("td");
+            String time = blocks.get(0).text();
+            blocks.remove(0);//Since I already got this
+
+            int currColumn = 0;//Corresponds to 1st column on Monday
+            for (Element block : blocks){
+                //This means that there is some new information about columns/times
+                int[] updateInfo = updateColumnInfo(columnInfo, currColumn, block);
+                currColumn = updateInfo[0];
+                int numRowsSpanned = updateInfo[1];
+
+                //Now that we've updated the column information, let's see if this block is for an officer
+                String officer = block.text();
+                if (!officer.isEmpty() && officer != null){
+                    //Let's get the day of the week
+                    String officeTime = getDay(currColumn) + " - " + time;
+
+                    //Now we will add an Officer Time to our map
+                    OfficerTime officerTime = new OfficerTime(officeTime, numRowsSpanned);
+                    if (officeHours.containsKey(officer)) officeHours.get(officer).add(officerTime);
+                    else {
+                        ArrayList<OfficerTime> newList = new ArrayList<OfficerTime>();
+                        newList.add(officerTime);
+                        officeHours.put(officer, newList);
+                    }
+                }
+            }
+
+            //Now I will decrease the num
+            for (int i = 0; i < 10; i++){
+                columnInfo[i]--;
+            }
+
+            currRow++;
+        }
+        System.out.println(officeHours);
+    }
+
     public void findOfficers(Document doc)
     {
         Elements officerList = doc.select("#top [role=main] #post-18 div ul li");// div");//Gets officer nodes
@@ -155,6 +209,69 @@ public class OfficerPage extends Activity {
         }
     }
 
+    //Helper functions
+
+    public int[] updateColumnInfo(int[] columnInfo, int currColumn, Element block){
+        int numRowsSpanned, numColsSpanned;
+        int[] returnVals = new int[2];
+
+        String getRows = block.attr("rowspan");
+        if (!getRows.isEmpty() && getRows != null) numRowsSpanned = Integer.parseInt(getRows);
+        else numRowsSpanned = 1;
+
+        String getCols = block.attr("colspan");
+        if (!getCols.isEmpty() && getCols != null) numColsSpanned = Integer.parseInt(getCols);
+        else numColsSpanned = 1;
+
+        int tempColumn = currColumn;
+        int colCounter = 0;
+        for (int i = tempColumn; i < 10; i++){
+            //Did loop this way so I could directly use i
+            if (columnInfo[i] != 0) continue;//This means that we are not in the right column
+            if (colCounter < numColsSpanned) {
+                columnInfo[i] = numRowsSpanned;
+                currColumn = i;//So that we can be accurate in our updates
+                colCounter++;
+            }
+            else break;
+        }
+
+        currColumn -= (numColsSpanned-1);//This should put us on the correct starting column
+        returnVals[0] = currColumn;
+        returnVals[1] = numRowsSpanned;
+        return returnVals;
+    }
+
+    public String getDay(int currColumn){
+        String day = new String();
+        switch(currColumn) {
+            case 0:
+            case 1:
+                day = "Monday";
+                break;
+            case 2:
+            case 3:
+                day = "Tuesday";
+                break;
+            case 4:
+            case 5:
+                day = "Wednesday";
+                break;
+            case 6:
+            case 7:
+                day = "Thursday";
+                break;
+            case 8:
+            case 9:
+                day = "Friday";
+                break;
+        }
+
+        return day;
+    }
+
+    //These classes are all of the threads used in this page
+
     //Adds a text view to the Layout
     private class AddText implements Runnable {
         LinearLayout layout;
@@ -197,6 +314,22 @@ public class OfficerPage extends Activity {
                     layout.addView(view);
                 }
             });
+        }
+    }
+
+    private class OfficeHours implements Runnable {
+        @Override
+        public void run() {
+            try {
+                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
+                String link = getOfficeHoursSheet(doc);
+                System.out.println(link);
+                doc = Jsoup.connect(link).timeout(10 * 1000).get();
+                getOfficeHours(doc);
+            }
+            catch (IOException e){
+                System.out.println("Couldn't connect to URL");
+            }
         }
     }
 
