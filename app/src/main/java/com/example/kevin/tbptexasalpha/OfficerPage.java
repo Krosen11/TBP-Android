@@ -1,19 +1,14 @@
 package com.example.kevin.tbptexasalpha;
 
-import android.app.ActionBar;
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v4.view.ViewPager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import org.jsoup.Jsoup;
@@ -23,19 +18,12 @@ import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.LineNumberReader;
-import java.net.MalformedURLException;
 import java.util.*;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 
 
 public class OfficerPage extends Activity {
-
-    //TODO: Also pull in officer office hours and display alongside the officer information
 
     public String html;
     public ArrayList<String> officers;
@@ -55,8 +43,7 @@ public class OfficerPage extends Activity {
         officeHours = new LinkedHashMap<String, ArrayList<OfficerTime>>();
 
         html = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
-        //OfficerData data = new OfficerData();
-        OfficeHours data = new OfficeHours();
+        OfficerThread data = new OfficerThread();
         Thread thread = new Thread(data);
         thread.start();
     }
@@ -142,7 +129,6 @@ public class OfficerPage extends Activity {
 
             currRow++;
         }
-        System.out.println(officeHours);
     }
 
     public void findOfficers(Document doc)
@@ -199,14 +185,22 @@ public class OfficerPage extends Activity {
             String position = part2.substring(0, space2);
             String contact = officer.substring(lastSpace + 1);
 
+            //Now let's get office hours from the map
+            ArrayList<String> times = officerOfficeHours(firstName);
+
             //Now let's display everything
-            Future pic = threadPool.submit(new AddPic(images.get(index), layout));
-            Future text1 = threadPool.submit(new AddText(name, layout));
-            Future text2 = threadPool.submit(new AddText(position, layout));
-            Future text3 = threadPool.submit(new AddText(contact, layout));
+            threadPool.submit(new AddPic(images.get(index), layout));
+            threadPool.submit(new AddText(name, layout));
+            threadPool.submit(new AddText(position, layout));
+            threadPool.submit(new AddText(contact, layout));
+            threadPool.submit(new AddText("Office Hours: ", layout));
+            for (String time : times){
+                threadPool.submit(new AddText("\t\t\t\t" + time, layout));
+            }
 
             index++;
         }
+        threadPool.shutdown();
     }
 
     //Helper functions
@@ -270,7 +264,131 @@ public class OfficerPage extends Activity {
         return day;
     }
 
+    public ArrayList<String> officerOfficeHours(String firstName){
+        ArrayList<String> times = new ArrayList<String>();
+        if (officeHours.containsKey(firstName)){
+            //ASSUME: Office hours will always be labeled by first name only! (And spelled right...)
+            for (OfficerTime time : officeHours.get(firstName)){
+                String startTime = time.getStartTime();
+                if (startTime.contains("noon")) startTime = startTime.replace("noon", "12");
+                int blocks = time.getHours();//This will tell us how much time to add for our hours
+
+                //Now let's try to format the time in a good way
+                int offset = 0;
+                int dashLoc = startTime.lastIndexOf('-');
+                String endTime = startTime.substring(dashLoc+1);
+                endTime = endTime.replaceAll(" ", "");
+                if (endTime.contains(":")) {
+                    offset = 50;
+                    int colonLoc = endTime.indexOf(':');
+                    endTime = endTime.substring(0, colonLoc);
+                }
+
+                offset = offset + (50*blocks) - 50;//Should allow us to rather easily calculate new end time
+                int hours = offset / 100;
+                boolean isColon = ((offset % 100) != 0);
+
+                int currHour = Integer.parseInt(endTime);
+                currHour += hours;
+                currHour = (currHour / 13) + (currHour % 13);
+                String newEndTime = Integer.toString(currHour);
+                if (isColon) newEndTime = newEndTime + ":30";
+
+                //Finally, let's recreate the time
+                String finalTime = startTime.substring(0, dashLoc+1) + newEndTime;
+                times.add(finalTime);
+            }
+        }
+
+        //Let's now sort the array list in day order
+        //TODO: Sort by times in case of being on the same day
+        for (int i = times.size()-1; i >= 0; i--){
+            String minTime = new String();
+            int minDate = Integer.MAX_VALUE;
+            int minIndex = -1;
+
+            for (int j = i; j >= 0; j--){
+                String currTime = times.get(j);
+                int date = -1;
+                if (currTime.contains("Monday")) date = 0;
+                else if (currTime.contains("Tuesday")) date = 1;
+                else if (currTime.contains("Wednesday")) date = 2;
+                else if (currTime.contains("Thursday")) date = 3;
+                else date = 4;
+
+                if (date < minDate){
+                    minDate = date;
+                    minTime = currTime;
+                    minIndex = j;
+                }
+            }
+
+            //Now we must move the min from times to the front
+            times.remove(minIndex);
+            times.add(minTime);
+        }
+
+        return times;
+    }
+
     //These classes are all of the threads used in this page
+
+    private class OfficerThread implements Runnable {
+        @Override
+        public void run() {
+            OfficeHours hours = new OfficeHours();
+            OfficerData data = new OfficerData();
+            Thread t1 = new Thread(hours);
+            Thread t2 = new Thread(data);
+            t1.start();
+            t2.start();
+            try {
+                t1.join();
+                t2.join();
+            }
+            catch (InterruptedException e){
+                System.out.println("Threads interrupted");
+            }
+            showOfficerInfo();
+            //Can only deal with ProgressDialogs on the UI thread
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    progressDialog.dismiss();
+                }
+            });
+        }
+    }
+
+    private class OfficeHours implements Runnable {
+        @Override
+        public void run() {
+            try {
+                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
+                String link = getOfficeHoursSheet(doc);
+                doc = Jsoup.connect(link).timeout(10 * 1000).get();
+                getOfficeHours(doc);
+            }
+            catch (IOException e){
+                System.out.println("Couldn't connect to URL");
+            }
+        }
+    }
+
+    //This class will get the Officer info from the website
+    private class OfficerData implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
+                findOfficers(doc);
+            }
+            catch (IOException e){
+                System.out.println("Couldn't connect to URL");
+            }
+        }
+    }
 
     //Adds a text view to the Layout
     private class AddText implements Runnable {
@@ -314,45 +432,6 @@ public class OfficerPage extends Activity {
                     layout.addView(view);
                 }
             });
-        }
-    }
-
-    private class OfficeHours implements Runnable {
-        @Override
-        public void run() {
-            try {
-                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
-                String link = getOfficeHoursSheet(doc);
-                System.out.println(link);
-                doc = Jsoup.connect(link).timeout(10 * 1000).get();
-                getOfficeHours(doc);
-            }
-            catch (IOException e){
-                System.out.println("Couldn't connect to URL");
-            }
-        }
-    }
-
-    //This class will get the Officer info from the website
-    private class OfficerData implements Runnable {
-
-        @Override
-        public void run() {
-            try {
-                Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
-                findOfficers(doc);
-                showOfficerInfo();
-                //Can only deal with ProgressDialogs on the UI thread
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        progressDialog.dismiss();
-                    }
-                });
-            }
-            catch (IOException e){
-                System.out.println("Couldn't connect to URL");
-            }
         }
     }
 }
