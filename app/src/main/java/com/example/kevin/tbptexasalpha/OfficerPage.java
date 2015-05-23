@@ -81,6 +81,16 @@ public class OfficerPage extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+    //NOTE: Going to add potential code for getting office hours
+    //doc.select("#sheets-viewport div div table tbody tr");
+    //Iterate through
+    //  Keep track of the current position of each column
+    //  Skip the first row (just the days of the week; 2 columns for each day)
+    //  Now for the current row:
+    //      Get the 30 minute time block of this row
+    //      For each new cell found
+    //          Check to see if there is a name in the Text. If so, add to that officer's hours (Map?)
+    //          If no name, still record the rows/columns the black space takes up.
     public void findOfficers(Document doc)
     {
         Elements officerList = doc.select("#top [role=main] #post-18 div ul li");// div");//Gets officer nodes

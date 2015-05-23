@@ -2,13 +2,8 @@ package com.example.kevin.tbptexasalpha;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.content.Intent;
-import android.net.http.AndroidHttpClient;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Looper;
-import android.provider.DocumentsContract;
 import android.support.v4.widget.DrawerLayout;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,22 +13,10 @@ import android.widget.*;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
-import org.xml.sax.InputSource;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.StringReader;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
-import javax.xml.parsers.DocumentBuilderFactory;
 
 
 public class LoginPage extends Activity {
@@ -70,7 +53,8 @@ public class LoginPage extends Activity {
 
     protected void getTBPMembers()
     {
-        String html2 = "https://docs.google.com/a/utexas.edu/spreadsheets/d/1cZK_XcDRVCatOfU825R-EO5WD7yrEh9m6rpKNLn-ePE/pubhtml?gid=302345735&single=true";
+        //String html2 = "https://docs.google.com/a/utexas.edu/spreadsheets/d/1cZK_XcDRVCatOfU825R-EO5WD7yrEh9m6rpKNLn-ePE/pubhtml?gid=302345735&single=true";
+        String html2 ="http://studentorgs.engr.utexas.edu/tbp/?page_id=74";
         ArrayUpdate update = new ArrayUpdate();
 
         //Starting a new thread to pull data from the internet
@@ -78,8 +62,8 @@ public class LoginPage extends Activity {
         Thread thread = new Thread(data);
         thread.start();
 
-        while (thread.isAlive()) {}
-        update.updateArray();
+        //while (thread.isAlive()) {}
+        //update.updateArray();
 
         int count = 0;
     }
@@ -113,17 +97,27 @@ public class LoginPage extends Activity {
         public boolean doneFlag;
         private ArrayList<String> candidates;
         private ArrayList<String[]> vals;//This is for the candidate's non-name state
+        private String docLink;
         public ArrayUpdate()
         {
             candidates = new ArrayList<String>();
             vals = new ArrayList<String[]>();
             doneFlag = false;
+            docLink = new String();
+        }
+
+        public void findLink(Document doc){
+            Elements links = doc.select("#top .x-container-fluid.max.width.offset.cf .x-main.left #post-74 .entry-wrap .entry-content p:contains(completion) [href]");
+            for (Element link : links){
+                //Only one of these
+                docLink = link.attr("href");
+            }
         }
 
         public void findCandidates(Document doc)
         {
-            int lineLock = 0;//Going to be used to get to actual candidate lines
-            Elements candidateList = doc.select("#sheets-viewport #302345735 div table tbody tr");
+            //int lineLock = 0;//Going to be used to get to actual candidate lines
+            Elements candidateList = doc.select("#sheets-viewport div div table tbody tr");
             for (Element line : candidateList) {
                 String word = line.text();
                 //This line is a blank line if the only text is the row #
@@ -132,24 +126,28 @@ public class LoginPage extends Activity {
                     char current = word.charAt(i);
                     if ((current > 'A' && current < 'Z') || (current > 'a' && current < 'z')) {
                         //This means that this char is a letter, so we are done
-                        foundChar = true;
+                        //foundChar = true;
                         break;
                     }
                 }
+                /*
                 if (!foundChar) {
                     //This means we have reached a new section, so let's reset lineLock
                     lineLock = 0;
                     continue;
                 }
+
                 if (lineLock < 2) {
                     lineLock++;
                     continue;
                 }
+                */
 
                 //If we get here, we are on a candidate line
                 Elements cells = line.getElementsByTag("td");
                 String firstName = cells.get(0).ownText();
                 String lastName = cells.get(1).ownText();
+                if (lastName.contains("Officer") || lastName.isEmpty() || firstName.isEmpty()) continue;
                 String name = firstName.concat(" " + lastName);
 
                 int counter = 0;
@@ -182,6 +180,7 @@ public class LoginPage extends Activity {
             for (String name : candidates)
             {
                 names.add(name);
+                System.out.println(name);
             }
 
             final ArrayList<String> nameList = names;
@@ -224,7 +223,15 @@ public class LoginPage extends Activity {
         public void run() {
             try {
                 Document doc = Jsoup.connect(html).timeout(10 * 1000).get();
+                update.findLink(doc);
+                doc = Jsoup.connect(update.docLink).timeout(10 * 1000).get();
                 update.findCandidates(doc);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        update.updateArray();
+                    }
+                });
             }
             catch (IOException e){
                 System.out.println("Couldn't connect to URL");
