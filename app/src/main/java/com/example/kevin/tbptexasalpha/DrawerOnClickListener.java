@@ -56,7 +56,7 @@ public class DrawerOnClickListener implements ListView.OnItemClickListener {
     }
 
     private void selectMenu(View view, int position){
-        if (position == 0) transitionActivity = OfficerPage.class;
+        if (position == 2) transitionActivity = OfficerPage.class;
         layout.closeDrawer(drawer);
     }
 }

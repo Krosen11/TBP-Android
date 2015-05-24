@@ -31,20 +31,9 @@ public class LoginPage extends Activity {
         setContentView(R.layout.activity_login_page);
         progressDialog = ProgressDialog.show(this, "Loading...", "Loading, please wait...");
 
-        //Testing drawer
-        String[] strings = new String[101];
-        strings[0] = "Officers";
-        for (int i = 1; i < 101; i++){
-            strings[i] = "Hello " + Integer.toString(i);
-        }
-
-        DrawerLayout layout = (DrawerLayout) findViewById(R.id.drawer_layout);
-        ListView drawerList = (ListView) findViewById(R.id.left_drawer);
-        DrawerOnClickListener drawer = new DrawerOnClickListener(LoginPage.this, layout, drawerList);
-
-        drawerList.setAdapter(new ArrayAdapter<String>(this,
-                R.layout.drawer_list_item, strings));
-        drawerList.setOnItemClickListener(drawer);
+        //Initializing drawer
+        CreateDrawer drawer = new CreateDrawer();
+        drawer.initializeDrawer(this);
 
         //Getting information for the login page
         getTBPMembers();

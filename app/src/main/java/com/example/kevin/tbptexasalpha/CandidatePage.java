@@ -9,7 +9,9 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 
 import org.achartengine.ChartFactory;
 import org.achartengine.chart.BarChart;
@@ -53,8 +55,11 @@ public class CandidatePage extends Activity {
             counter++;
         }
 
+        //TODO: Add transparency to the checkmark picture and maybe the TBP Logo picture (xmark already has it)
+
+        //NOTE: No longer doing a graph!
         //Time to create the graph
-        createGraph();
+        //createGraph();
     }
 
     @Override
@@ -79,6 +84,7 @@ public class CandidatePage extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+    /*
     protected void createGraph()
     {
         XYSeries candidateGraph = new XYSeries("Candidate");
@@ -165,4 +171,5 @@ public class CandidatePage extends Activity {
         View newChart = ChartFactory.getBarChartView(CandidatePage.this, dataset, multiRenderer, BarChart.Type.DEFAULT);
         chart.addView(newChart);
     }
+    */
 }
