@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 
 import org.achartengine.ChartFactory;
 import org.achartengine.chart.BarChart;
@@ -24,7 +25,7 @@ import org.achartengine.renderer.XYSeriesRenderer;
 public class CandidatePage extends Activity {
 
     private String name;
-    private int[] values;
+    private double[] values;
 
     private static final String[] REQUIREMENTS = new String[]{"Informal Interview", "Resume", "Catalog Cards",
         "Dues", "Scrapbook", "Bent", "Quiz", "Dress Up", "Sig Block", "Meetings", "Firesides", "Socials",
@@ -35,12 +36,15 @@ public class CandidatePage extends Activity {
     private static final int HOURS_SERVICE = 10;
     private static final int TEAM_POINTS = 0;//For now
 
+    private static final int[] EXPECTED_RESULTS = new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, NUM_MEETINGS,
+            NUM_FIRESIDES, HOURS_SOCIAL, HOURS_SERVICE, 200};
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_candidate_page);
 
-        values = new int[14];
+        values = new double[14];
         int counter = 0;
 
         Intent intent = getIntent();
@@ -51,7 +55,7 @@ public class CandidatePage extends Activity {
             String current;
             if (val.equals("X")) {current = "1";}
             else {current = val;}
-            values[counter] = Integer.parseInt(current);
+            values[counter] = Double.parseDouble(current);
             counter++;
         }
 
@@ -60,6 +64,9 @@ public class CandidatePage extends Activity {
         //NOTE: No longer doing a graph!
         //Time to create the graph
         //createGraph();
+        Candidate candidate = new Candidate();
+        Thread thread = new Thread(candidate);
+        thread.start();
     }
 
     @Override
@@ -172,4 +179,29 @@ public class CandidatePage extends Activity {
         chart.addView(newChart);
     }
     */
+
+    public void outputInfo(){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                LinearLayout layout = (LinearLayout) findViewById(R.id.lin_layout);
+                for (int i = 0; i < 14; i++) {
+                    //loop through every requirement
+                    String output = REQUIREMENTS[i] + ": ";
+                    output += Double.toString(values[i]) + " / " + EXPECTED_RESULTS[i];
+
+                    TextView view = new TextView(CandidatePage.this);
+                    view.setText(output);
+                    layout.addView(view);
+                }
+            }
+        });
+    }
+
+    private class Candidate implements Runnable{
+        @Override
+        public void run() {
+            outputInfo();
+        }
+    }
 }

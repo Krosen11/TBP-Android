@@ -51,9 +51,6 @@ public class LoginPage extends Activity {
         Thread thread = new Thread(data);
         thread.start();
 
-        //while (thread.isAlive()) {}
-        //update.updateArray();
-
         int count = 0;
     }
 

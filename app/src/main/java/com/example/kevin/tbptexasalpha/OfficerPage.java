@@ -8,10 +8,14 @@ import android.os.Bundle;
 import android.support.v4.widget.DrawerLayout;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import org.jsoup.Jsoup;
@@ -30,6 +34,8 @@ public class OfficerPage extends Activity {
 
     public String html;
     public ArrayList<String> officers;
+    public ArrayList<String> officerNames;//Using for showOfficerInfo
+    public ArrayList<String> officerPositions;
     public ArrayList<ImageView> images;
     private ProgressDialog progressDialog;
     private Map<String,ArrayList<OfficerTime>> officeHours;
@@ -47,6 +53,8 @@ public class OfficerPage extends Activity {
 
         officers = new ArrayList<String>();
         images = new ArrayList<ImageView>();
+        officerNames = new ArrayList<String>();
+        officerPositions = new ArrayList<String>();
         officeHours = new LinkedHashMap<String, ArrayList<OfficerTime>>();
 
         html = "http://studentorgs.engr.utexas.edu/tbp/?page_id=18";
@@ -166,6 +174,9 @@ public class OfficerPage extends Activity {
     public void showOfficerInfo() {
 
         int index = 0;
+        ArrayList<String> names = new ArrayList<String>();
+        ArrayList<String> positions = new ArrayList<String>();
+
         LinearLayout layout = (LinearLayout) findViewById(R.id.officer_layout);
         ExecutorService threadPool = Executors.newSingleThreadExecutor();
 
@@ -192,6 +203,10 @@ public class OfficerPage extends Activity {
             String position = part2.substring(0, space2);
             String contact = officer.substring(lastSpace + 1);
 
+            //Add to array lists
+            officerNames.add(name);
+            officerPositions.add(position);
+
             //Now let's get office hours from the map
             ArrayList<String> times = officerOfficeHours(firstName);
 
@@ -204,10 +219,19 @@ public class OfficerPage extends Activity {
             for (String time : times){
                 threadPool.submit(new AddText("\t\t\t\t" + time, layout));
             }
+            threadPool.submit(new AddText("", layout));
 
             index++;
         }
         threadPool.shutdown();
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                implementSpinners();
+            }
+        });
+
     }
 
     //Helper functions
@@ -308,7 +332,12 @@ public class OfficerPage extends Activity {
         }
 
         //Let's now sort the array list in day order
-        //TODO: Sort by times in case of being on the same day
+        times = sortOfficeHours(times);
+
+        return times;
+    }
+
+    public ArrayList<String> sortOfficeHours(ArrayList<String> times){
         for (int i = times.size()-1; i >= 0; i--){
             String minTime = new String();
             int minDate = Integer.MAX_VALUE;
@@ -328,6 +357,88 @@ public class OfficerPage extends Activity {
                     minTime = currTime;
                     minIndex = j;
                 }
+
+                else if (date == minDate){
+                    //We will try to get the start time for both
+                    String currentMinStart = minTime.substring(minTime.indexOf('-')+2, minTime.lastIndexOf('-'));
+                    String ourMinStart = currTime.substring(currTime.indexOf('-')+2, currTime.lastIndexOf('-'));
+                    int index1 = 0;
+                    int index2 = 0;
+                    boolean isOut1 = false;
+                    boolean isOut2 = false;
+
+                    while ((index1 < currentMinStart.length()) && (index2 < ourMinStart.length())){
+                        if (index1+1 == currentMinStart.length()) isOut1 = true;
+                        if (index2+1 == ourMinStart.length()) isOut2 = true;
+
+                        //Go char by char to find the smallest time
+                        int char1 = currentMinStart.charAt(index1);
+                        int char2 = ourMinStart.charAt(index2);
+                        if (char1 < char2){
+                            if (isOut1){
+                                //This means that the current min is smaller, so we are done
+                                break;
+                            }
+                            else {
+                                if (ourMinStart.contains("8") || ourMinStart.contains("9")){
+                                    //This means that our value is the smallest
+                                    minDate = date;
+                                    minTime = currTime;
+                                    minIndex = j;
+                                    break;
+                                }
+                                else {
+                                    //This means that the current min is the smallest
+                                    break;
+                                }
+                            }
+                        }
+                        else if (char1 > char2){
+                            if (isOut2){
+                                //This means that our value is smaller, so let's update the min
+                                minDate = date;
+                                minTime = currTime;
+                                minIndex = j;
+                                break;
+                            }
+                            else {
+                                if (currentMinStart.contains("8") || currentMinStart.contains("9")){
+                                    //This means that current min is the smallest
+                                    break;
+                                }
+                                else {
+                                    //This means that our value is the smallest
+                                    minDate = date;
+                                    minTime = currTime;
+                                    minIndex = j;
+                                    break;
+                                }
+                            }
+                        }
+                        else {
+                            //We still need to see if one is bigger than the other here
+                            if (isOut1 && !isOut2){
+                                //Means current min is the smallest, unless current min is a 1
+                                if (currentMinStart.equals("1")){
+                                    minDate = date;
+                                    minTime = currTime;
+                                    minIndex = j;
+                                    break;
+                                }
+                                break;
+                            }
+                            else if (!isOut1 && isOut2) {
+                                //Means our value is the smallest
+                                minDate = date;
+                                minTime = currTime;
+                                minIndex = j;
+                                break;
+                            }
+                            index1++;
+                            index2++;
+                        }
+                    }
+                }
             }
 
             //Now we must move the min from times to the front
@@ -336,6 +447,51 @@ public class OfficerPage extends Activity {
         }
 
         return times;
+    }
+
+    public void implementSpinners(){
+        //First, let's add a prompt item to each array
+        officerNames.add(0, "Select Officer by Name");
+        officerPositions.add(0, "Select Officer by Position");
+
+        //Deal with spinners
+        Spinner spinName = (Spinner) findViewById(R.id.choose_name);
+        ArrayAdapter<String> adapterName = new ArrayAdapter<String>(OfficerPage.this, android.R.layout.simple_spinner_item, officerNames);
+        adapterName.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinName.setAdapter(adapterName);
+        spinName.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                if (i == 0) return;//This is the default. We don't want to do anything here
+                //Now let's scroll to the appropriate spot
+                ScrollView scrollView = (ScrollView) findViewById(R.id.scroll_view);
+                scrollView.smoothScrollTo(0, images.get(i-1).getTop());
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+                //Do nothing
+            }
+        });
+
+        Spinner spinPos = (Spinner) findViewById(R.id.choose_position);
+        ArrayAdapter<String> adapterPos = new ArrayAdapter<String>(OfficerPage.this, android.R.layout.simple_spinner_item, officerPositions);
+        adapterPos.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinPos.setAdapter(adapterPos);
+        spinPos.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                if (i == 0) return;//This is the default. We don't want to do anything here
+                //Now let's scroll to the appropriate spot
+                ScrollView scrollView = (ScrollView) findViewById(R.id.scroll_view);
+                scrollView.smoothScrollTo(0, images.get(i - 1).getTop());
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+                //Do nothing
+            }
+        });
     }
 
     //These classes are all of the threads used in this page
