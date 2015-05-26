@@ -6,9 +6,12 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.Html;
+import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -61,12 +64,56 @@ public class CandidatePage extends Activity {
 
         //TODO: Add transparency to the checkmark picture and maybe the TBP Logo picture (xmark already has it)
 
+        RelativeLayout layout = (RelativeLayout) findViewById(R.id.rel_layout);
+
+        //Let's first output a textview for the heading
+        LinearLayout linearLayout = new LinearLayout(this);
+        linearLayout.setOrientation(LinearLayout.VERTICAL);
+
+        TextView view = new TextView(this);
+        view.setText(name);
+        view.setTypeface(null, Typeface.BOLD);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 32);
+        view.setSingleLine(true);
+        int viewId = View.generateViewId();
+        view.setId(viewId);
+
+        TextView view2 = new TextView(this);
+        view2.setText("Progress Towards Candidate Requirements");
+        view2.setTypeface(null, Typeface.ITALIC);
+
+        linearLayout.addView(view);
+        linearLayout.addView(view2);
+        layout.addView(linearLayout);
+
+        /*
+        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.FILL_PARENT);
+        params.addRule(RelativeLayout.ALIGN_PARENT_TOP, RelativeLayout.TRUE);
+        params.addRule(RelativeLayout.ALIGN_PARENT_LEFT, RelativeLayout.TRUE);
+        layout.addView(view, params);
+
+
+        TextView view2 = new TextView(this);
+        //view2.setText("Progress Towards Candidate Requirements");
+        view2.setText("B");
+        view2.setTypeface(null, Typeface.ITALIC);
+
+        params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.FILL_PARENT);
+        //params.addRule(RelativeLayout.ALIGN_PARENT_LEFT, RelativeLayout.TRUE);
+        params.addRule(RelativeLayout.BELOW, view.getId());
+        layout.addView(view2, params);
+
+        view = new TextView(this);
+        view.setText("");
+        layout.addView(view);
+
         //NOTE: No longer doing a graph!
         //Time to create the graph
         //createGraph();
         Candidate candidate = new Candidate();
         Thread thread = new Thread(candidate);
         thread.start();
+        */
     }
 
     @Override
@@ -184,7 +231,8 @@ public class CandidatePage extends Activity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                LinearLayout layout = (LinearLayout) findViewById(R.id.lin_layout);
+                RelativeLayout layout = (RelativeLayout) findViewById(R.id.rel_layout);
+
                 for (int i = 0; i < 14; i++) {
                     //loop through every requirement
                     String output = REQUIREMENTS[i] + ": ";
